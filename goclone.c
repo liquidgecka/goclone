@@ -20,15 +20,27 @@
 // The maximum length of a filename read from the proc.
 #define FILENAMESIZE 4096
 
+// FIXME
+#include <sys/mount.h>
+
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <sched.h>
 #include <stdio.h>
+#include <string.h>
 #include <sysexits.h>
 #include <unistd.h>
 
 #include "goclone.h"
+
+// Set a boolean that tell us if user namespaces are enabled in the kernel.
+#ifdef CLONE_NEWUSER
+int goclone_user_namespace_enabled = 1;
+#else
+int goclone_user_namespace_enabled = 0;
+#endif
 
 // Force close a file descriptor.
 static void close_fd(int fd)
@@ -192,6 +204,40 @@ static void join_namespace(char *namespace)
     }
 }
 
+// Sets up the directories for this process.
+static void setup_directories(goclone_cmd *cmd)
+{
+    // Chroot
+    if (cmd->chroot_dir != NULL && cmd->chroot_dir[0] != '\0') {
+        if (chroot(cmd->chroot_dir) == -1) {
+            _exit(EX_OSERR);
+        }
+    }
+
+    // Chdir
+    if (cmd->dir != NULL && cmd->dir[0] != '\0') {
+        if (chdir(cmd->dir) == -1) {
+            _exit(EX_OSERR);
+        }
+    } else {
+        if (chdir("/") == -1) {
+            _exit(EX_OSERR);
+        }
+    }
+}
+
+// Mounts /proc if requested.
+static void mount_proc(goclone_cmd *cmd)
+{
+    if (cmd->mount_new_proc != true) {
+        return;
+    }
+
+    if (mount("none", "/proc", "proc", 0, NULL) != 0) {
+        _exit(EX_OSERR);
+    }
+}
+
 // Sets up the credentials of the process if necessary.
 static void set_credentials(goclone_cmd *cmd)
 {
@@ -221,28 +267,6 @@ static void set_credentials(goclone_cmd *cmd)
     }
 }
 
-// Sets up the directories for this process.
-static void setup_directories(goclone_cmd *cmd)
-{
-    // Chroot
-    if (cmd->chroot_dir != NULL && cmd->chroot_dir[0] != '\0') {
-        if (chroot(cmd->chroot_dir) == -1) {
-            _exit(EX_OSERR);
-        }
-    }
-
-    // Chdir
-    if (cmd->dir != NULL && cmd->dir[0] != '\0') {
-        if (chdir(cmd->dir) == -1) {
-            _exit(EX_OSERR);
-        }
-    } else {
-        if (chdir("/") == -1) {
-            _exit(EX_OSERR);
-        }
-    }
-}
-
 // clone() destination which will exec the real user process.
 static int exec_func(void *v)
 {
@@ -259,14 +283,22 @@ static int exec_func(void *v)
     join_namespace(cmd->ipc_namespace);
     join_namespace(cmd->mount_namespace);
     join_namespace(cmd->network_namespace);
-    join_namespace(cmd->uts_namespace);
     join_namespace(cmd->pid_namespace);
+    join_namespace(cmd->user_namespace);
+    join_namespace(cmd->uts_namespace);
 
     // Directory management.
     setup_directories(cmd);
 
+    // Mount /proc
+    mount_proc(cmd);
+
     // Set credentials.
     set_credentials(cmd);
+
+    // Attempt to lock the mutex. Until this mutex can be locked we need
+    // to block so the parent can complete any work necessary.
+    pthread_mutex_lock(&(cmd->pre_exec_mutex));
 
     // Execute the command.
     execve(cmd->path, cmd->args, cmd->env);
@@ -281,7 +313,7 @@ static int clone_flags(goclone_cmd *cmd)
 {
     int flags;
 
-    flags = CLONE_VFORK | cmd->death_signal;
+    flags = 0 | cmd->death_signal;
     if (cmd->new_ipc_namespace) {
         flags |= CLONE_NEWIPC;
     }
@@ -293,6 +325,9 @@ static int clone_flags(goclone_cmd *cmd)
     }
     if (cmd->new_pid_namespace) {
         flags |= CLONE_NEWPID;
+    }
+    if (cmd->new_user_namespace) {
+        flags |= CLONE_NEWUSER;
     }
     if (cmd->new_uts_namespace) {
         flags |= CLONE_NEWUTS;
@@ -315,19 +350,86 @@ static int df_func(void *v)
     _exit(0);
 }
 
+// Writes the given values completely to the given file.
+static int write_file(char *fn, char *data, int data_len)
+{
+    int fd;
+
+    if ((fd = open(fn, O_WRONLY | O_TRUNC)) < 0) {
+        return -1;
+    }
+    if (write(fd, data, data_len) != data_len) {
+        if (close(fd) == -1) {
+            return -1;
+        }
+        return -1;
+    }
+    if (close(fd) == -1) {
+        return -1;
+    }
+
+    return 0;
+}
+
+// This function is used to write the contents of a map file.
+static int write_mapfiles(goclone_parent_data *data, pid_t pid)
+{
+    int fd;
+    char fn[FILENAMESIZE];
+
+    // uid_map
+    if (data->uid_map != NULL) {
+        if (sprintf(fn, "/proc/%d/uid_map", (int)pid) < 0) {
+            return -1;
+        }
+        if (write_file(fn, data->uid_map, data->uid_map_length) != 0) {
+            return -1;
+        }
+    }
+
+    // gid_map
+    if (data->gid_map != NULL) {
+        if (sprintf(fn, "/proc/%d/gid_map", (int)pid) < 0) {
+            return -1;
+        }
+        if (write_file(fn, data->gid_map, data->gid_map_length) != 0) {
+            return -1;
+        }
+    }
+
+    // Success
+    return 0;
+}
+
+
 // This is the destination function called from inside of Start().
-pid_t goclone(goclone_cmd *cmd)
+pid_t goclone(goclone_cmd *cmd, goclone_parent_data *data)
 {
     int flags;
     pid_t pid;
 
+    // Initialize the mutex.
+    pthread_mutexattr_init(&(cmd->pre_exec_mutex_attr));
+    pthread_mutexattr_setpshared(
+        &(cmd->pre_exec_mutex_attr), PTHREAD_PROCESS_SHARED);
+    pthread_mutex_init(
+        &(cmd->pre_exec_mutex), &(cmd->pre_exec_mutex_attr));
+    pthread_mutex_lock(&(cmd->pre_exec_mutex));
+
     if (cmd->double_fork) {
-        flags = CLONE_VFORK | cmd->death_signal;
+        flags = 0 | cmd->death_signal;
         pid = clone(df_func, cmd->df_stack, flags, cmd);
     } else {
         flags = clone_flags(cmd);
         pid = clone(exec_func, cmd->stack, flags, cmd);
     }
+
+    // Make sure that the uid and gid map files get written if they were
+    // defined in the data structure.
+    write_mapfiles(data, pid);
+
+    // Unlock the mutex so that the child may continue.
+    pthread_mutex_unlock(&(cmd->pre_exec_mutex));
 
     return pid;
 }

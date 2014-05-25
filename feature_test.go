@@ -371,35 +371,35 @@ func TestFeatureSysProcAttrCredential(t *testing.T) {
 }
 
 func TestFeatureSysProcAttrChroot(t *testing.T) {
-	t.Skip("Test not implemented.")
+	t.Skip("FIXME: Test not implemented.")
 }
 
 func TestFeatureSysProcAttrPtrace(t *testing.T) {
-	t.Skip("Funtionality not implemented.")
+	t.Skip("TODO: Funtionality not implemented.")
 }
 
 func TestFeatureSysProcAttrSetsid(t *testing.T) {
-	t.Skip("Funtionality not implemented.")
+	t.Skip("TODO: Funtionality not implemented.")
 }
 
 func TestFeatureSysProcAttrSetpgid(t *testing.T) {
-	t.Skip("Funtionality not implemented.")
+	t.Skip("TODO: Funtionality not implemented.")
 }
 
 func TestFeatureSysProcAttrSetCtty(t *testing.T) {
-	t.Skip("Funtionality not implemented.")
+	t.Skip("TODO: Funtionality not implemented.")
 }
 
 func TestFeatureSysProcAttrNotty(t *testing.T) {
-	t.Skip("Funtionality not implemented.")
+	t.Skip("TODO: Funtionality not implemented.")
 }
 
 func TestFeatureSysProcAttrCtty(t *testing.T) {
-	t.Skip("Funtionality not implemented.")
+	t.Skip("TODO: Funtionality not implemented.")
 }
 
 func TestFeatureSysProcAttrPdeathsig(t *testing.T) {
-	t.Skip("Test not implemented.")
+	t.Skip("FIXME: Test not implemented.")
 }
 
 func TestFeatureCgroupsTasksFiles(t *testing.T) {
@@ -442,41 +442,161 @@ func TestFeatureCgroupsTasksFiles(t *testing.T) {
 }
 
 func TestFeatureDoubleFork(t *testing.T) {
-	t.Skipf("Test not implemented.")
+	t.Skipf("FIXME: Test not implemented.")
 }
 
 func TestFeatureIPCNameSpace(t *testing.T) {
-	t.Skipf("Test not implemented.")
+	// Check to see if ipc namespaces are supported.
+	if _, ok := SupportedNamespaces(t)["ipc"]; !ok {
+		t.Skip("Kernel doesn't support ipc namespaces.")
+	}
+
+	t.Skipf("FIXME: Test not implemented.")
 }
 
 func TestFeatureMountNameSpace(t *testing.T) {
-	t.Skipf("Test not implemented.")
+	// Check to see if mount namespaces are supported.
+	if _, ok := SupportedNamespaces(t)["mount"]; !ok {
+		t.Skip("Kernel doesn't support mount namespaces.")
+	}
+
+	t.Skipf("FIXME: Test not implemented.")
 }
 
 func TestFeatureNetworkNameSpace(t *testing.T) {
-	t.Skipf("Test not implemented.")
+	// Check to see if network namespaces are supported.
+	if _, ok := SupportedNamespaces(t)["net"]; !ok {
+		t.Skip("Kernel doesn't support network namespaces.")
+	}
+
+	t.Skipf("FIXME: Test not implemented.")
+}
+
+func TestFeatureUserNameSpace(t *testing.T) {
+	// Check to see if user namespaces are supported.
+	if _, ok := SupportedNamespaces(t)["user"]; !ok {
+		t.Skip("Kernel doesn't support user namespaces.")
+	}
+
+	t.Skipf("FIXME: Test not implemented.")
 }
 
 func TestFeatureUTSNameSpace(t *testing.T) {
-	t.Skipf("Test not implemented.")
+	// Check to see if UTS namespaces are supported.
+	if _, ok := SupportedNamespaces(t)["uts"]; !ok {
+		t.Skip("Kernel doesn't support uts namespaces.")
+	}
+
+	t.Skipf("FIXME: Test not implemented.")
 }
 
 func TestFeatureNewIPCNameSpace(t *testing.T) {
-	t.Skipf("Test not implemented.")
+	// Check to see if IPC namespaces are supported.
+	if _, ok := SupportedNamespaces(t)["ipc"]; !ok {
+		t.Skip("Kernel doesn't support IPC namespaces.")
+	}
+
+	t.Skipf("FIXME: Test not implemented.")
 }
 
 func TestFeatureNewMountNameSpace(t *testing.T) {
-	t.Skipf("Test not implemented.")
+	// Check to see if mount namespaces are supported.
+	if _, ok := SupportedNamespaces(t)["mount"]; !ok {
+		t.Skip("Kernel doesn't support mount namespaces.")
+	}
+
+	t.Skipf("FIXME: Test not implemented.")
 }
 
 func TestFeatureNewNetworkNameSpace(t *testing.T) {
-	t.Skipf("Test not implemented.")
+	// Check to see if network namespaces are supported.
+	if _, ok := SupportedNamespaces(t)["network"]; !ok {
+		t.Skip("Kernel doesn't support network namespaces.")
+	}
+
+	t.Skipf("FIXME: Test not implemented.")
 }
 
 func TestFeatureNewPIDNameSpace(t *testing.T) {
-	t.Skipf("Test not implemented.")
+	// Check to see if PID namespaces are supported.
+	if _, ok := SupportedNamespaces(t)["pid"]; !ok {
+		t.Skip("Kernel doesn't support pid namespaces.")
+	}
+
+	t.Skipf("FIXME: Test not implemented.")
+}
+
+func TestFeatureNewUserNameSpace(t *testing.T) {
+	// Check to see if user namespaces are supported.
+	if _, ok := SupportedNamespaces(t)["user"]; !ok {
+		t.Skip("Kernel doesn't support user namespaces.")
+	}
+
+	t.Skipf("FIXME: Test not implemented.")
 }
 
 func TestFeatureNewUTSNameSpace(t *testing.T) {
-	t.Skipf("Test not implemented.")
+	// Check to see if UTC namespaces are supported.
+	if _, ok := SupportedNamespaces(t)["utc"]; !ok {
+		t.Skip("Kernel doesn't support utc namespaces.")
+	}
+
+	t.Skipf("FIXME: Test not implemented.")
+}
+
+func TestFeatureUserMap(t *testing.T) {
+	// Check to see if user namespaces are supported.
+	if _, ok := SupportedNamespaces(t)["user"]; !ok {
+		t.Skip("Kernel doesn't support user namespaces.")
+	}
+
+	// Make a temporary directory.
+	tmpDir, err := ioutil.TempDir("", "TestFeatureNewUserNameSpace")
+	if err != nil {
+		t.Fatalf("Error maping a temporary directory: %s", err)
+	}
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Fatalf("Error removing temp directory: %s", err)
+		}
+	}()
+
+	// Make sure that the user can write to that temporary directory.
+	if err := os.Chmod(tmpDir, 0777); err != nil {
+		t.Fatalf("Error chmoding the temp directory: %s", err)
+	}
+
+	// Run a command that should touch a file in that temp directory as
+	// root in the user name space.
+	tmpFile := tmpDir + "/test"
+	c := Command(touchBin, tmpFile)
+	c.NewUserNameSpace = true
+	c.UserMap = []MapElement{
+		MapElement{Inside: 0, Outside: 1000, Length: 1},
+	}
+	c.SysProcAttr = &syscall.SysProcAttr{}
+	c.SysProcAttr.Credential = &syscall.Credential{}
+	c.SysProcAttr.Credential.Uid = 0
+	c.SysProcAttr.Credential.Gid = 0
+	if err := c.Start(); err != nil {
+		t.Fatalf("Error running the command: %s", err)
+	} else if err := c.Wait(); err != nil {
+		t.Fatalf("Error waiting on the command: %s", err)
+	}
+
+	// See if the file was created.
+	var stat syscall.Stat_t
+	if err := syscall.Stat(tmpFile, &stat); err != nil {
+		t.Fatalf("Error while stating the output file: %s", err)
+	} else if stat.Uid != 1000 {
+		t.Fatalf("User was not set properly, expected 1000, got %d", stat.Uid)
+	}
+}
+func TestFeatureGroupMap(t *testing.T) {
+	// Check to see if user namespaces are supported.
+	if _, ok := SupportedNamespaces(t)["user"]; !ok {
+		t.Skip("Kernel doesn't support user namespaces.")
+	}
+
+	t.Skip("FIXME: Not implemented.")
 }

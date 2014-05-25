@@ -20,8 +20,8 @@ import (
 )
 
 var (
-	osOpenFile      = os.OpenFile
 	osOpen          = os.Open
+	osOpenFile      = os.OpenFile
 	osPipe          = os.Pipe
 	syscallMmap     = syscall.Mmap
 	syscallMprotect = syscall.Mprotect

@@ -59,4 +59,7 @@
 // * Implement the functionality in SysProcAttr fully.
 // * Finish testing some of the more edge case functionality.
 // * Better documentation.
+// * Warning about user name spaces and setuid being required.
+// * Automatic proc mounting in the child for pid name spaces.
+// * User namespace support in the CLI.
 package goclone

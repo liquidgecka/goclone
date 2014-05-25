@@ -24,15 +24,32 @@ import (
 	"os/exec"
 	"sync"
 	"syscall"
+	"unsafe"
 )
 
 // #include "goclone.h"
 import "C"
 
+// This data element is used to represent a user namespace uid or gid mapping.
+// The three fields are represented in the uid_map or gid_map /proc eitries.
+//
+// Example: {Inside: 0, Outside: 1000, Length: 4096}
+// Using these settings would make the uid 0 inside of the namespace map to
+// the uid 1000 outside, 1 would map to 1001, so on until 4095 would map to
+// 5095.
+type MapElement struct {
+	// This is the UID or GID to use inside of the user namespace.
+	Inside uint64
+
+	// This is the UID or GID to use outside of the user namespace.
+	Outside uint64
+
+	// This sets how many mappings this should cover.
+	Length uint64
+}
+
 // This is a structure that mirrors the basic model of os/exec.Cmd but enables
 // a ton of extra very linux specific features via the "clone" system call.
-//
-// FIXME
 type Cmd struct {
 	// This is the path to the binary that should be executed.
 	Path string
@@ -99,6 +116,7 @@ type Cmd struct {
 	IPCNameSpace     string
 	MountNameSpace   string
 	NetworkNameSpace string
+	UserNameSpace    string
 	UTSNameSpace     string
 	PIDNameSpace     string
 
@@ -109,7 +127,21 @@ type Cmd struct {
 	NewMountNameSpace   bool
 	NewNetworkNameSpace bool
 	NewPIDNameSpace     bool
+	NewUserNameSpace    bool
 	NewUTSNameSpace     bool
+
+	// If NewUserNameSpace is set to true then these two fields will allow
+	// the user map to be defined in the new user namespace. It is an error
+	// to define these if NewUserNameSpace is not true. Leaving these as
+	// nil will cause gocloen to not alter the user or group settings in
+	// the new namespace.
+	//
+	// An important note here is that the user namespace does not kick in
+	// until a call to setuid() and setgid() takes place. As such you
+	// should almost always use UserNameSpace and NewUserNameSpace with
+	// SysProcAttr set to some UID and GID.
+	UserMap  []MapElement
+	GroupMap []MapElement
 
 	// ------------
 	// Private Data
@@ -197,6 +229,27 @@ func (c *Cmd) Start() (err error) {
 	// If the process has already started then we can not continue here.
 	if c.Process != nil {
 		return fmt.Errorf("goclone: already started.")
+	}
+
+	// Check that UserMap and GroupMap are not defined if NewUserNameSpace
+	// is not true.
+	switch {
+	case c.NewUserNameSpace:
+	case c.UserMap != nil:
+		return fmt.Errorf("goclone: UserMap set but NewUserNameSpace is false.")
+	case c.GroupMap != nil:
+		return fmt.Errorf(
+			"goclone: GroupMap set but NewUserNameSpace is false.")
+	}
+
+	// Check to see if user name spaces are being used when the support
+	// for them does not exist in the kernel.
+	switch {
+	case C.goclone_user_namespace_enabled == 1:
+	case c.NewUserNameSpace:
+		fallthrough
+	case c.UserNameSpace != "":
+		return fmt.Errorf("goclone: The kernel lacks user namespace support.")
 	}
 
 	// This function will walk through all of the file descriptors closing them
@@ -346,13 +399,22 @@ func (c *Cmd) Start() (err error) {
 	cmd.ipc_namespace = m.pushString(c.IPCNameSpace)
 	cmd.mount_namespace = m.pushString(c.MountNameSpace)
 	cmd.network_namespace = m.pushString(c.NetworkNameSpace)
+	cmd.user_namespace = m.pushString(c.UserNameSpace)
 	cmd.uts_namespace = m.pushString(c.UTSNameSpace)
 	cmd.pid_namespace = m.pushString(c.PIDNameSpace)
 	cmd.new_ipc_namespace = C.bool(c.NewIPCNameSpace)
 	cmd.new_network_namespace = C.bool(c.NewNetworkNameSpace)
 	cmd.new_pid_namespace = C.bool(c.NewPIDNameSpace)
 	cmd.new_mount_namespace = C.bool(c.NewMountNameSpace)
+	cmd.new_user_namespace = C.bool(c.NewUserNameSpace)
 	cmd.new_uts_namespace = C.bool(c.NewUTSNameSpace)
+
+	// See if we should mount a new /proc from the underlying process.
+	if os.Getuid() == 0 && c.NewPIDNameSpace {
+		cmd.mount_new_proc = C.bool(true)
+	} else {
+		cmd.mount_new_proc = C.bool(false)
+	}
 
 	// Various simple settings.
 	cmd.double_fork = C.bool(c.DoubleFork)
@@ -375,8 +437,43 @@ func (c *Cmd) Start() (err error) {
 		}
 	}
 
+	// Next we need to create a goclone_parent_data for use by the parent when
+	// helpign with the child.
+	var data C.goclone_parent_data
+
+	// Setup the uid_map. This will be written to /proc/child/uid_map if
+	// defined.
+	var uid_map bytes.Buffer
+	if c.UserMap == nil {
+		data.uid_map = nil
+		data.uid_map_length = 0
+	} else {
+		for i := range c.UserMap {
+			elm := &c.UserMap[i]
+			fmt.Fprintf(&uid_map, "%d %d %d\n", elm.Inside, elm.Outside, elm.Length)
+		}
+		data.uid_map = (*C.char)(unsafe.Pointer(&(uid_map.Bytes()[0])))
+		data.uid_map_length = (C.int)(uid_map.Len())
+	}
+
+	// Setup the gid_map. This will be written to /proc/child/gid_map if
+	// defined.
+	var gid_map bytes.Buffer
+	if c.UserMap == nil {
+		data.gid_map = nil
+		data.gid_map_length = 0
+	} else {
+		for i := range c.UserMap {
+			elm := &c.UserMap[i]
+			fmt.Fprintf(&gid_map, "%d %d %d\n", elm.Inside, elm.Outside, elm.Length)
+		}
+		b := gid_map.Bytes()
+		data.gid_map = (*C.char)(unsafe.Pointer(&b[0]))
+		data.gid_map_length = (C.int)(gid_map.Len())
+	}
+
 	// Call the C function.
-	pid, err := C.goclone(cmd)
+	pid, err := C.goclone(cmd, &data)
 
 	// Close any file descriptors that are no longer needed.
 	err = closeDescriptors(c.closeAfterStart, err)

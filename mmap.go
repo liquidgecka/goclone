@@ -74,6 +74,7 @@ func rawDataSize(c *Cmd) int {
 	dataSize += len(c.IPCNameSpace) + 1
 	dataSize += len(c.MountNameSpace) + 1
 	dataSize += len(c.NetworkNameSpace) + 1
+	dataSize += len(c.UserNameSpace) + 1
 	dataSize += len(c.UTSNameSpace) + 1
 
 	return dataSize
@@ -90,7 +91,7 @@ type mmapData struct {
 
 // Called to allocate the given space using mmap.
 func mmapDataAlloc(size int) (*mmapData, error) {
-	flags := syscall.MAP_PRIVATE | syscall.MAP_ANONYMOUS
+	flags := syscall.MAP_SHARED | syscall.MAP_ANONYMOUS
 	prot := syscall.PROT_WRITE | syscall.PROT_READ
 	data, err := syscallMmap(-1, 0, size, prot, flags)
 	if err != nil {

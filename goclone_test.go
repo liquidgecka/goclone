@@ -36,6 +36,21 @@ const (
 	trueBin  = "/bin/true"
 )
 
+func SupportedNamespaces(t *testing.T) map[string]bool {
+	files, err := ioutil.ReadDir("/proc/self/ns")
+	if err != nil && os.IsNotExist(err) {
+		return make(map[string]bool, 0)
+	} else if err != nil {
+		t.Fatalf("Error listing known namespaces: %s", err)
+	}
+
+	ret := make(map[string]bool, 10)
+	for _, file := range files {
+		ret[file.Name()] = true
+	}
+	return ret
+}
+
 func TestNecessaryBinariesExist(t *testing.T) {
 	if _, err := os.Lstat(catBin); err != nil {
 		t.Errorf("Missing %s", catBin)
@@ -608,7 +623,7 @@ func Test_closeDescriptors(t *testing.T) {
 
 	// FIXME: check the fds?
 
-	t.Skip("Test not finished.")
+	t.Skip("FIXME: Test not finished.")
 }
 
 func TestCmd_reader(t *testing.T) {

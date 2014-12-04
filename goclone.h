@@ -63,6 +63,11 @@ typedef struct goclone_cmd {
     // This is necessary if you are creating new namespaces.
     bool mount_new_proc;
 
+    // If true then some useful /dev bind mounts will be created in the new
+    // chroot. This can be done outside of the clone/exec cycle, but is
+    // provided here as a utility.
+    bool create_pseudo_devices;
+
     // Set to true if the process should double fork.
     bool double_fork;
 

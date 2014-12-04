@@ -116,9 +116,9 @@ type Cmd struct {
 	IPCNameSpace     string
 	MountNameSpace   string
 	NetworkNameSpace string
+	PIDNameSpace     string
 	UserNameSpace    string
 	UTSNameSpace     string
-	PIDNameSpace     string
 
 	// These boolean values are used to let the clone system know that it
 	// should use the flags that specifically create new name spaces when
@@ -142,6 +142,9 @@ type Cmd struct {
 	// SysProcAttr set to some UID and GID.
 	UserMap  []MapElement
 	GroupMap []MapElement
+
+	// Create pseudo devices: tty, random, urandom, null, full, zero
+	CreatePseudoDevices bool
 
 	// ------------
 	// Private Data
@@ -414,6 +417,13 @@ func (c *Cmd) Start() (err error) {
 		cmd.mount_new_proc = C.bool(true)
 	} else {
 		cmd.mount_new_proc = C.bool(false)
+	}
+
+	// Should we bind mount devices in /dev for the new process?
+	if c.CreatePseudoDevices && chrootDir != "" {
+		cmd.create_pseudo_devices = C.bool(true)
+	} else {
+		cmd.create_pseudo_devices = C.bool(false)
 	}
 
 	// Various simple settings.

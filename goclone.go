@@ -123,6 +123,12 @@ type Cmd struct {
 	closeAfterStart []io.Closer
 	closeAfterWait  []io.Closer
 
+	// A list of routines that need to be run in order to copy data from a
+	// os.File object into an io.Reader or io.Writer. These will be executed
+	// in a goroutine once the process has started and will be terminated
+	// as part of the Wait() call.
+	copyRoutines []func()
+
 	// Set to true if the process has already been waited on.
 	finished bool
 
@@ -379,6 +385,13 @@ func (c *Cmd) Start() (err error) {
 	// but on linux an error can never be returned.
 	c.Process, _ = os.FindProcess(int(pid))
 
+	// Start all of the copy goroutines.
+	for _, f := range c.copyRoutines {
+		c.errWG.Add(1)
+		go f()
+	}
+	c.copyRoutines = nil
+
 	return
 }
 
@@ -529,13 +542,12 @@ func (c *Cmd) reader(reader io.Reader) (fd *os.File, err error) {
 	// Add the file descriptors to the various tracking routines.
 	c.closeAfterStart = append(c.closeAfterStart, fd)
 	c.closeAfterWait = append(c.closeAfterWait, w)
-	c.errWG.Add(1)
-	go func() {
+	c.copyRoutines = append(c.copyRoutines, func() {
 		_, err := io.Copy(w, reader)
 		c.setError(err)
 		c.setError(w.Close())
 		c.errWG.Done()
-	}()
+	})
 	return
 }
 
@@ -573,8 +585,8 @@ func (c *Cmd) writer(writer io.Writer) (fd *os.File, err error) {
 	}
 
 	// The writer is a io.Writer but is not an os.File so a goroutine needs to
-	// be started in order to shuttle data from the internal writer to the
-	// real file descriptor.
+	// be started in order to shuttle data from the actual file object over to
+	// the writer passed in.
 	r, fd, err := osPipe()
 	if err != nil {
 		return
@@ -583,12 +595,11 @@ func (c *Cmd) writer(writer io.Writer) (fd *os.File, err error) {
 	// Add the file descriptors to the various tracking routines.
 	c.closeAfterStart = append(c.closeAfterStart, fd)
 	c.closeAfterWait = append(c.closeAfterWait, r)
-	c.errWG.Add(1)
-	go func() {
+	c.copyRoutines = append(c.copyRoutines, func() {
 		_, err := io.Copy(writer, r)
 		c.setError(err)
 		c.setError(r.Close())
 		c.errWG.Done()
-	}()
+	})
 	return
 }

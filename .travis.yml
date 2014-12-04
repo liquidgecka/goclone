@@ -1,5 +1,37 @@
 language: go
-go: 1.1
+matrix:
+  allow_failures:
+    - go: tip
+  fast_finish: true
+  include:
+    - go: 1.1
+      env: SRC=""
+    - go: 1.2
+      env: SRC="code.google.com/p/go.tools/cmd"
+    - go: 1.3
+      env: SRC="code.google.com/p/go.tools/cmd"
+    - go: tip
+      env: SRC="golang.org/x/tools/cmd"
+
+before_script:
+  - test -z "$SRC" || go get "$SRC/cover"
+  - test -z "$SRC" || go install "$SRC/cover"
+  - test -z "$SRC" || go get "$SRC/vet"
+  - test -z "$SRC" || go install "$SRC/vet"
+  - test -z "$SRC" || go get github.com/mattn/goveralls
+  - test -z "$SRC" || go install github.com/mattn/goveralls
+  - test -z "$SRC" || sudo -E $(which go) install -a -race std
 
 script:
- - sudo -E $(which go) test -v
+  - test -z "$(gofmt -l . | tee /dev/stderr)"
+  - go vet .
+  - sudo -E $(which go) test -v
+  - test -z "$SRC" || sudo -E $(which go) test -covermode=count -coverprofile=/tmp/coverage.out
+  - test -z "$SRC" || sudo -E $(which go) test -v -race .
+
+after_script:
+ - $HOME/gopath/bin/goveralls -coverprofile=/tmp/coverage.out -service=travis-ci -repotoken $COVERALLS_TOKEN
+
+env:
+  global:
+    secure: meZV7KAwusRQFUrNlIJYTfkueUd/Tz1JrdLshLuXgI7GiuZfPEPrtxr+56Zz7dniTDoNNBTkLIIBjCmmX8ldy31XoxLeslo+DoBR1gljv59hYKmw4sWyekaueduidrAMLIjrgDWn3LdU2ZkkvZTrd8U2eahGN63XRxOolYdf9Fc=

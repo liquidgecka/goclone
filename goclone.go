@@ -478,7 +478,7 @@ func (c *Cmd) Wait() (err error) {
 	// If the process exited with a non zero status then return a special
 	// error type just like exec.Wait()
 	if err == nil && !c.ProcessState.Success() {
-		return &exec.ExitError{c.ProcessState}
+		return &exec.ExitError{ProcessState: c.ProcessState}
 	}
 
 	return err

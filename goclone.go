@@ -19,12 +19,12 @@ package goclone
 import (
 	"bytes"
 	"fmt"
-	"unsafe"
 	"io"
 	"os"
 	"os/exec"
 	"sync"
 	"syscall"
+	"unsafe"
 )
 
 // #include "goclone.h"
@@ -118,6 +118,7 @@ type Cmd struct {
 	NetworkNameSpace string
 	UserNameSpace    string
 	UTSNameSpace     string
+	PIDNameSpace     string
 
 	// These boolean values are used to let the clone system know that it
 	// should use the flags that specifically create new name spaces when
@@ -139,8 +140,11 @@ type Cmd struct {
 	// until a call to setuid() and setgid() takes place. As such you
 	// should almost always use UserNameSpace and NewUserNameSpace with
 	// SysProcAttr set to some UID and GID.
-	UserMap []MapElement
+	UserMap  []MapElement
 	GroupMap []MapElement
+
+	// Create pseudo devices: tty, random, urandom, null, full, zero
+	CreatePseudoDevices bool
 
 	// ------------
 	// Private Data
@@ -161,8 +165,8 @@ type Cmd struct {
 	// field will be populated, otherwise it will be left as nil. Mutations
 	// of this field should be done through the setError function which will
 	// lock the mutex.
-	err      error
-	errWG    sync.WaitGroup
+	err   error
+	errWG sync.WaitGroup
 }
 
 // This is a helper function that will create a Cmd object with the given
@@ -394,6 +398,7 @@ func (c *Cmd) Start() (err error) {
 	cmd.network_namespace = m.pushString(c.NetworkNameSpace)
 	cmd.user_namespace = m.pushString(c.UserNameSpace)
 	cmd.uts_namespace = m.pushString(c.UTSNameSpace)
+	cmd.pid_namespace = m.pushString(c.PIDNameSpace)
 	cmd.new_ipc_namespace = C.bool(c.NewIPCNameSpace)
 	cmd.new_network_namespace = C.bool(c.NewNetworkNameSpace)
 	cmd.new_pid_namespace = C.bool(c.NewPIDNameSpace)
@@ -406,6 +411,10 @@ func (c *Cmd) Start() (err error) {
 		cmd.mount_new_proc = C.bool(true)
 	} else {
 		cmd.mount_new_proc = C.bool(false)
+	}
+
+	if c.CreatePseudoDevices {
+		cmd.create_pseudo_devices = C.bool(true)
 	}
 
 	// Various simple settings.

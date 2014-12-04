@@ -100,6 +100,7 @@ type Cmd struct {
 	MountNameSpace   string
 	NetworkNameSpace string
 	UTSNameSpace     string
+	PIDNameSpace     string
 
 	// These boolean values are used to let the clone system know that it
 	// should use the flags that specifically create new name spaces when
@@ -129,8 +130,8 @@ type Cmd struct {
 	// field will be populated, otherwise it will be left as nil. Mutations
 	// of this field should be done through the setError function which will
 	// lock the mutex.
-	err      error
-	errWG    sync.WaitGroup
+	err   error
+	errWG sync.WaitGroup
 }
 
 // This is a helper function that will create a Cmd object with the given
@@ -340,6 +341,7 @@ func (c *Cmd) Start() (err error) {
 	cmd.mount_namespace = m.pushString(c.MountNameSpace)
 	cmd.network_namespace = m.pushString(c.NetworkNameSpace)
 	cmd.uts_namespace = m.pushString(c.UTSNameSpace)
+	cmd.pid_namespace = m.pushString(c.PIDNameSpace)
 	cmd.new_ipc_namespace = C.bool(c.NewIPCNameSpace)
 	cmd.new_network_namespace = C.bool(c.NewNetworkNameSpace)
 	cmd.new_pid_namespace = C.bool(c.NewPIDNameSpace)

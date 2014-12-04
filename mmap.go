@@ -75,6 +75,7 @@ func rawDataSize(c *Cmd) int {
 	dataSize += len(c.MountNameSpace) + 1
 	dataSize += len(c.NetworkNameSpace) + 1
 	dataSize += len(c.UTSNameSpace) + 1
+	dataSize += len(c.PIDNameSpace) + 1
 
 	return dataSize
 }
@@ -138,7 +139,7 @@ func (m *mmapData) pushGocloneCmd() *C.goclone_cmd {
 }
 
 // Pushes an integer array into the mmapData buffer.
-func (m *mmapData) pushIntSlice(is []int) *C.int{
+func (m *mmapData) pushIntSlice(is []int) *C.int {
 	ptr := unsafe.Pointer(&m.data[m.offset])
 	nextptr := ptr
 	for _, i := range is {
@@ -153,7 +154,7 @@ func (m *mmapData) pushIntSlice(is []int) *C.int{
 }
 
 // Pushes an array of gid_t's into the mmapData buffer.
-func (m *mmapData) pushGidSlice(gs []uint32) *C.gid_t{
+func (m *mmapData) pushGidSlice(gs []uint32) *C.gid_t {
 	ptr := unsafe.Pointer(&m.data[m.offset])
 	nextptr := ptr
 	for _, g := range gs {

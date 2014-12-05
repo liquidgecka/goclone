@@ -143,6 +143,10 @@ type Cmd struct {
 	UserMap  []MapElement
 	GroupMap []MapElement
 
+	// If set to true then the child process will create pseudo
+	// devices: tty, zero, null, full, random, urandom
+	CreatePseudoDevices bool
+
 	// ------------
 	// Private Data
 	// ------------
@@ -414,6 +418,10 @@ func (c *Cmd) Start() (err error) {
 		cmd.mount_new_proc = C.bool(true)
 	} else {
 		cmd.mount_new_proc = C.bool(false)
+	}
+
+	if c.CreatePseudoDevices {
+		cmd.create_pseudo_devices = C.bool(true)
 	}
 
 	// Various simple settings.

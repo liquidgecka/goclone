@@ -63,6 +63,10 @@ typedef struct goclone_cmd {
     // This is necessary if you are creating new namespaces.
     bool mount_new_proc;
 
+    // If set to true then the child process will create pseudo
+    // devices: tty, zero, null, full, random, urandom
+    bool create_pseudo_devices;
+
     // Set to true if the process should double fork.
     bool double_fork;
 

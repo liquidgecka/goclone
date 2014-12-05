@@ -420,9 +420,7 @@ func (c *Cmd) Start() (err error) {
 		cmd.mount_new_proc = C.bool(false)
 	}
 
-	if c.CreatePseudoDevices {
-		cmd.create_pseudo_devices = C.bool(true)
-	}
+	cmd.create_pseudo_devices = C.bool(c.CreatePseudoDevices)
 
 	// Various simple settings.
 	cmd.double_fork = C.bool(c.DoubleFork)

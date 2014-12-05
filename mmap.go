@@ -78,6 +78,8 @@ func rawDataSize(c *Cmd) int {
 	dataSize += len(c.UserNameSpace) + 1
 	dataSize += len(c.UTSNameSpace) + 1
 
+	dataSize += len(c.Hostname) + 1
+
 	return dataSize
 }
 

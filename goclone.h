@@ -29,6 +29,7 @@ typedef struct goclone_cmd {
     char **env;
     char *dir;
     char *chroot_dir;
+    char *hostname;
 
     // File descriptors.
     int *files;

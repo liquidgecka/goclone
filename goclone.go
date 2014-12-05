@@ -387,6 +387,8 @@ func (c *Cmd) Start() (err error) {
 	// Set hostname only for new UTS namespace
 	if c.NewUTSNameSpace {
 		cmd.hostname = m.pushString(c.Hostname)
+	} else {
+		cmd.hostname = m.pushString("")
 	}
 
 	// file descriptors.

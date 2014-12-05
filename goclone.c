@@ -240,12 +240,6 @@ static void mount_proc(goclone_cmd *cmd)
 
 static void bindnode(char *src, char *dst)
 {
-    int fd;
-
-    if ((fd = open(dst, O_WRONLY | O_CREAT, 0600)) >= 0) {
-        close(fd);
-    }
-
     if (mount(src, dst, NULL, MS_BIND, NULL) < 0) {
         error(1, 0, "Failed to bind %s into new /dev filesystem", src);
     }

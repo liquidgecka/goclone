@@ -74,9 +74,9 @@ func rawDataSize(c *Cmd) int {
 	dataSize += len(c.IPCNameSpace) + 1
 	dataSize += len(c.MountNameSpace) + 1
 	dataSize += len(c.NetworkNameSpace) + 1
+	dataSize += len(c.PIDNameSpace) + 1
 	dataSize += len(c.UserNameSpace) + 1
 	dataSize += len(c.UTSNameSpace) + 1
-	dataSize += len(c.PIDNameSpace) + 1
 
 	return dataSize
 }
@@ -101,6 +101,15 @@ func mmapDataAlloc(size int) (*mmapData, error) {
 	return &mmapData{data: data}, nil
 }
 
+// Checks to see if the expected offset is larger than the allocation. If so
+// we need to panic since we have possibly corrupted memory. This should never
+// happen, but is setup to ensure that we have a safety check.
+func (m *mmapData) panicIfOverAllocated() {
+	if m.offset > len(m.data) {
+		panic("data over allocation.")
+	}
+}
+
 // Unmaps the data in the mmapData structure.
 func (m *mmapData) free() error {
 	return syscallMunmap(m.data)
@@ -115,9 +124,7 @@ func (m *mmapData) mprotect() error {
 	protected := m.data[m.offset : m.offset+pageSize]
 	err := syscallMprotect(protected, syscall.PROT_NONE)
 	m.offset += pageSize
-	if m.offset > len(m.data) {
-		panic("data over allocation.")
-	}
+	m.panicIfOverAllocated()
 	return err
 }
 
@@ -133,9 +140,7 @@ func (m *mmapData) stack() unsafe.Pointer {
 func (m *mmapData) pushGocloneCmd() *C.goclone_cmd {
 	ptr := (*C.goclone_cmd)(unsafe.Pointer(&m.data[m.offset]))
 	m.offset += int(unsafe.Sizeof(C.goclone_cmd{}))
-	if m.offset > len(m.data) {
-		panic("data over allocation.")
-	}
+	m.panicIfOverAllocated()
 	return ptr
 }
 
@@ -148,9 +153,7 @@ func (m *mmapData) pushIntSlice(is []int) *C.int {
 		m.offset += intSize
 		nextptr = unsafe.Pointer(&m.data[m.offset])
 	}
-	if m.offset > len(m.data) {
-		panic("data over allocation.")
-	}
+	m.panicIfOverAllocated()
 	return (*C.int)(ptr)
 }
 
@@ -163,9 +166,7 @@ func (m *mmapData) pushGidSlice(gs []uint32) *C.gid_t {
 		m.offset += gidSize
 		nextptr = unsafe.Pointer(&m.data[m.offset])
 	}
-	if m.offset > len(m.data) {
-		panic("data over allocation.")
-	}
+	m.panicIfOverAllocated()
 	return (*C.gid_t)(ptr)
 }
 
@@ -176,9 +177,7 @@ func (m *mmapData) pushString(s string) *C.char {
 	copy(m.data[m.offset:m.offset+len(s)], s)
 	m.data[m.offset+len(s)] = 0
 	m.offset += len(s) + 1
-	if m.offset > len(m.data) {
-		panic("data over allocation.")
-	}
+	m.panicIfOverAllocated()
 	return (*C.char)(ptr)
 }
 
@@ -194,8 +193,6 @@ func (m *mmapData) pushStringSlice(ss []string) **C.char {
 		nextptr = unsafe.Pointer(uintptr(nextptr) + uintptr(ptrSize))
 	}
 	*(*unsafe.Pointer)(nextptr) = unsafe.Pointer(nil)
-	if m.offset > len(m.data) {
-		panic("data over allocation.")
-	}
+	m.panicIfOverAllocated()
 	return (**C.char)(arr)
 }

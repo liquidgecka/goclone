@@ -19,6 +19,7 @@ package goclone
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -371,7 +372,62 @@ func TestFeatureSysProcAttrCredential(t *testing.T) {
 }
 
 func TestFeatureSysProcAttrChroot(t *testing.T) {
-	t.Skip("FIXME: Test not implemented.")
+	// Check ti see if /bin/busybox exists, without it we will not have
+	// a static binary to run in the root.
+	sourceFd, err := os.Open("/bin/busybox")
+	if err != nil {
+		if os.IsNotExist(err) {
+			t.Skipf("Skipping due to a missing /bin/busybox")
+		}
+		t.Fatalf("Unknown error stating busybox: %s", err)
+	}
+
+	// Next we make a directory to "chroot" into, and copy the busybox binary
+	// into it.
+	mode := os.FileMode(0777)
+	flags := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+	dir, err := ioutil.TempDir("", "goclone")
+	if err != nil {
+		t.Fatalf("Error making temporary directory: %s", err)
+	}
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Fatalf("Error removing temp dir: %s", err)
+		}
+	}()
+	if destFd, err := os.OpenFile(dir+"/busybox", flags, mode); err != nil {
+		t.Fatalf("Error creating file: %s", err)
+	} else if _, err := io.Copy(destFd, sourceFd); err != nil {
+		t.Fatalf("Error copying file contents: %s", err)
+	} else if err := sourceFd.Close(); err != nil {
+		t.Fatalf("Error closing the source file: %s", err)
+	} else if err := destFd.Close(); err != nil {
+		t.Fatalf("Error closing the dest file: %s", err)
+	}
+
+	// Now we can attempt to execute the busybox binary in a chrooted
+	// environment.
+	cmd := Command("/busybox", "sleep", "10")
+	cmd.SysProcAttr = &syscall.SysProcAttr{Chroot: dir}
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("Error starting the command: %s", err)
+	}
+	defer cmd.Wait()
+	defer cmd.Process.Kill()
+
+	// Wait for the process to fully start.
+	if err := waitForProcessStart(cmd.Process.Pid, "/busybox"); err != nil {
+		t.Fatalf("%s", err)
+	}
+
+	// Start with the link.. The link should be to the directory we created
+	// above.
+	root := fmt.Sprintf("/proc/%d/root", cmd.Process.Pid)
+	if link, err := os.Readlink(root); err != nil {
+		t.Fatalf("Error reading the root link: %s", err)
+	} else if link != dir {
+		t.Fatalf("Process had the wrong root, should be %s, is %s", dir, link)
+	}
 }
 
 func TestFeatureSysProcAttrPtrace(t *testing.T) {

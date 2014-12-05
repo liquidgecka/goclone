@@ -226,6 +226,15 @@ static void setup_directories(goclone_cmd *cmd)
     }
 }
 
+static void set_hostname(goclone_cmd *cmd)
+{
+    if (cmd->hostname != NULL && cmd->hostname[0] != '\0') {
+        if(sethostname(cmd->hostname, strlen(cmd->hostname)) != 0) {
+            _exit(EX_OSERR);
+        }
+    }
+}
+
 // Mounts /proc if requested.
 static void mount_proc(goclone_cmd *cmd)
 {
@@ -292,6 +301,9 @@ static int exec_func(void *v)
 
     // Mount /proc
     mount_proc(cmd);
+
+    // Set hostname in net ns
+    set_hostname(cmd);
 
     // Set credentials.
     set_credentials(cmd);

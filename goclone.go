@@ -143,6 +143,9 @@ type Cmd struct {
 	UserMap  []MapElement
 	GroupMap []MapElement
 
+	// Hostname in net ns
+	Hostname string
+
 	// ------------
 	// Private Data
 	// ------------
@@ -380,6 +383,7 @@ func (c *Cmd) Start() (err error) {
 	cmd.env = m.pushStringSlice(c.Env)
 	cmd.dir = m.pushString(c.Dir)
 	cmd.chroot_dir = m.pushString(chrootDir)
+	cmd.hostname = m.pushString(c.Hostname)
 
 	// file descriptors.
 	cmd.files = m.pushIntSlice(files)

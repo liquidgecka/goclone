@@ -36,12 +36,10 @@ func checkCommandLine(pid int, command string) error {
 	cmdlineFile := fmt.Sprintf("/proc/%d/cmdline", pid)
 	contents, err := ioutil.ReadFile(cmdlineFile)
 	if err != nil {
-		fmt.Printf("Error reading file: %s\n", err)
 		return err
 	}
 	arg1 := bytes.Split(contents, []byte{0})[0]
 	if !bytes.Equal(arg1, []byte(command)) {
-		fmt.Printf("Command line not correct for %d: %s\n", pid, string(contents))
 		return fmt.Errorf("Command line not correct: %s\n", string(contents))
 	}
 	return nil

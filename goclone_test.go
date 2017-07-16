@@ -55,7 +55,6 @@ func SupportedNamespaces(t *testing.T) map[string]bool {
 		ret[file.Name()] = true
 	}
 	supportedNamespaces = ret
-	fmt.Println(ret)
 	return ret
 }
 

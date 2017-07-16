@@ -146,6 +146,10 @@ type Cmd struct {
 	// Hostname in net ns
 	Hostname string
 
+	// If set to true then the child process will create pseudo
+	// devices: tty, zero, null, full, random, urandom
+	CreatePseudoDevices bool
+
 	// ------------
 	// Private Data
 	// ------------
@@ -425,6 +429,9 @@ func (c *Cmd) Start() (err error) {
 	} else {
 		cmd.mount_new_proc = C.bool(false)
 	}
+
+	// Create the pseudo devices if requested.
+	cmd.create_pseudo_devices = C.bool(c.CreatePseudoDevices)
 
 	// Various simple settings.
 	cmd.double_fork = C.bool(c.DoubleFork)

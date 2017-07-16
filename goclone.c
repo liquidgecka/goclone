@@ -248,6 +248,27 @@ static void mount_proc(goclone_cmd *cmd)
     }
 }
 
+static void bindnode(char *src, char *dst)
+{
+    if (mount(src, dst, NULL, MS_BIND, NULL) < 0) {
+        error(1, 0, "Failed to bind %s into new /dev filesystem", src);
+    }
+}
+
+static void create_pseudo_devices(goclone_cmd *cmd)
+{
+    if (cmd->create_pseudo_devices != true) {
+        return;
+    }
+
+    bindnode("/dev/full", "dev/full");
+    bindnode("/dev/null", "dev/null");
+    bindnode("/dev/random", "dev/random");
+    bindnode("/dev/tty", "dev/tty");
+    bindnode("/dev/urandom", "dev/urandom");
+    bindnode("/dev/zero", "dev/zero");
+}
+
 // Sets up the credentials of the process if necessary.
 static void set_credentials(goclone_cmd *cmd)
 {
@@ -302,6 +323,9 @@ static int exec_func(void *v)
 
     // Mount /proc
     mount_proc(cmd);
+
+    // Create pseudo devices: tty, zero, null, full, random, urandom
+    create_pseudo_devices(cmd);
 
     // Set hostname in net ns
     set_hostname(cmd);

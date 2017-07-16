@@ -742,8 +742,6 @@ func TestFeatureNewUTSNameSpace(t *testing.T) {
 }
 
 func TestFeatureUserMap(t *testing.T) {
-	t.Skip("Usermaps are broken since go 1.6...")
-
 	// Check to see if user namespaces are supported.
 	if v, ok := SupportedNamespaces(t)["user"]; !ok || !v {
 		t.Skip("Kernel doesn't support user namespaces.")

@@ -24,7 +24,6 @@ import (
 	"os/exec"
 	"sync"
 	"syscall"
-	"unsafe"
 )
 
 // #include "goclone.h"
@@ -469,8 +468,8 @@ func (c *Cmd) Start() (err error) {
 			elm := &c.UserMap[i]
 			fmt.Fprintf(&uid_map, "%d %d %d\n", elm.Inside, elm.Outside, elm.Length)
 		}
-		data.uid_map = (*C.char)(unsafe.Pointer(&(uid_map.Bytes()[0])))
 		data.uid_map_length = (C.int)(uid_map.Len())
+		data.uid_map = C.CString(uid_map.String())
 	}
 
 	// Setup the gid_map. This will be written to /proc/child/gid_map if
@@ -484,9 +483,8 @@ func (c *Cmd) Start() (err error) {
 			elm := &c.UserMap[i]
 			fmt.Fprintf(&gid_map, "%d %d %d\n", elm.Inside, elm.Outside, elm.Length)
 		}
-		b := gid_map.Bytes()
-		data.gid_map = (*C.char)(unsafe.Pointer(&b[0]))
 		data.gid_map_length = (C.int)(gid_map.Len())
+		data.gid_map = C.CString(gid_map.String())
 	}
 
 	// Call the C function.

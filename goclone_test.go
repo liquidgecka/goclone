@@ -36,7 +36,13 @@ const (
 	trueBin  = "/bin/true"
 )
 
+var supportedNamespaces map[string]bool
+
 func SupportedNamespaces(t *testing.T) map[string]bool {
+	if supportedNamespaces != nil {
+		return supportedNamespaces
+	}
+
 	files, err := ioutil.ReadDir("/proc/self/ns")
 	if err != nil && os.IsNotExist(err) {
 		return make(map[string]bool, 0)
@@ -48,6 +54,8 @@ func SupportedNamespaces(t *testing.T) map[string]bool {
 	for _, file := range files {
 		ret[file.Name()] = true
 	}
+	supportedNamespaces = ret
+	fmt.Println(ret)
 	return ret
 }
 

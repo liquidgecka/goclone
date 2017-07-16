@@ -420,7 +420,7 @@ func (c *Cmd) Start() (err error) {
 	cmd.new_uts_namespace = C.bool(c.NewUTSNameSpace)
 
 	// See if we should mount a new /proc from the underlying process.
-	if os.Getuid() == 0 && c.NewPIDNameSpace {
+	if os.Getuid() == 0 && c.NewPIDNameSpace && c.NewMountNameSpace {
 		cmd.mount_new_proc = C.bool(true)
 	} else {
 		cmd.mount_new_proc = C.bool(false)
@@ -448,7 +448,7 @@ func (c *Cmd) Start() (err error) {
 	}
 
 	// Next we need to create a goclone_parent_data for use by the parent when
-	// helpign with the child.
+	// helping with the child.
 	var data C.goclone_parent_data
 
 	// Setup the uid_map. This will be written to /proc/child/uid_map if

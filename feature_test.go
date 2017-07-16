@@ -36,11 +36,13 @@ func checkCommandLine(pid int, command string) error {
 	cmdlineFile := fmt.Sprintf("/proc/%d/cmdline", pid)
 	contents, err := ioutil.ReadFile(cmdlineFile)
 	if err != nil {
+		fmt.Printf("Error reading file: %s\n", err)
 		return err
 	}
 	arg1 := bytes.Split(contents, []byte{0})[0]
 	if !bytes.Equal(arg1, []byte(command)) {
-		return fmt.Errorf("Command line not correct: %s", string(contents))
+		fmt.Printf("Command line not correct for %d: %s\n", pid, string(contents))
+		return fmt.Errorf("Command line not correct: %s\n", string(contents))
 	}
 	return nil
 }
@@ -503,7 +505,7 @@ func TestFeatureDoubleFork(t *testing.T) {
 
 func TestFeatureIPCNameSpace(t *testing.T) {
 	// Check to see if ipc namespaces are supported.
-	if _, ok := SupportedNamespaces(t)["ipc"]; !ok {
+	if v, ok := SupportedNamespaces(t)["ipc"]; !ok || !v {
 		t.Skip("Kernel doesn't support ipc namespaces.")
 	}
 
@@ -512,8 +514,8 @@ func TestFeatureIPCNameSpace(t *testing.T) {
 
 func TestFeatureMountNameSpace(t *testing.T) {
 	// Check to see if mount namespaces are supported.
-	if _, ok := SupportedNamespaces(t)["mount"]; !ok {
-		t.Skip("Kernel doesn't support mount namespaces.")
+	if v, ok := SupportedNamespaces(t)["mnt"]; !ok || !v {
+		t.Skip("Kernel doesn't support mnt namespaces.")
 	}
 
 	t.Skipf("FIXME: Test not implemented.")
@@ -521,7 +523,7 @@ func TestFeatureMountNameSpace(t *testing.T) {
 
 func TestFeatureNetworkNameSpace(t *testing.T) {
 	// Check to see if network namespaces are supported.
-	if _, ok := SupportedNamespaces(t)["net"]; !ok {
+	if v, ok := SupportedNamespaces(t)["net"]; !ok || !v {
 		t.Skip("Kernel doesn't support network namespaces.")
 	}
 
@@ -530,7 +532,7 @@ func TestFeatureNetworkNameSpace(t *testing.T) {
 
 func TestFeatureUserNameSpace(t *testing.T) {
 	// Check to see if user namespaces are supported.
-	if _, ok := SupportedNamespaces(t)["user"]; !ok {
+	if v, ok := SupportedNamespaces(t)["user"]; !ok || !v {
 		t.Skip("Kernel doesn't support user namespaces.")
 	}
 
@@ -539,7 +541,7 @@ func TestFeatureUserNameSpace(t *testing.T) {
 
 func TestFeatureUTSNameSpace(t *testing.T) {
 	// Check to see if UTS namespaces are supported.
-	if _, ok := SupportedNamespaces(t)["uts"]; !ok {
+	if v, ok := SupportedNamespaces(t)["uts"]; !ok || !v {
 		t.Skip("Kernel doesn't support uts namespaces.")
 	}
 
@@ -547,26 +549,81 @@ func TestFeatureUTSNameSpace(t *testing.T) {
 }
 
 func TestFeatureNewIPCNameSpace(t *testing.T) {
-	// Check to see if IPC namespaces are supported.
-	if _, ok := SupportedNamespaces(t)["ipc"]; !ok {
+	if v, ok := SupportedNamespaces(t)["ipc"]; !ok || !v {
 		t.Skip("Kernel doesn't support IPC namespaces.")
 	}
 
-	t.Skipf("FIXME: Test not implemented.")
+	cmd := Command(sleepBin, "60")
+	cmd.NewIPCNameSpace = true
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("Unexpected error: %s", err)
+	}
+	defer cmd.Wait()
+	defer cmd.Process.Kill()
+
+	if err := waitForProcessStart(cmd.Process.Pid, sleepBin); err != nil {
+		t.Fatalf("%s", err)
+	}
+
+	// Read my processes' pid name space.
+	myNS, err := os.Readlink("/proc/self/ns/ipc")
+	if err != nil {
+		t.Fatalf("Unexpected error: %s", err)
+	}
+
+	// Read the child processes' pid name space.
+	childNSFile := fmt.Sprintf("/proc/%d/ns/ipc", cmd.Process.Pid)
+	childNS, err := os.Readlink(childNSFile)
+	if err != nil {
+		t.Fatalf("Unexpected error: %s", err)
+	}
+
+	// Make sure that they are NOT the same.
+	if childNS == myNS {
+		t.Fatalf("Namespace of child not changed.")
+	}
 }
 
 func TestFeatureNewMountNameSpace(t *testing.T) {
-	// Check to see if mount namespaces are supported.
-	if _, ok := SupportedNamespaces(t)["mount"]; !ok {
-		t.Skip("Kernel doesn't support mount namespaces.")
+	// Check to see if mnt namespaces are supported.
+	if v, ok := SupportedNamespaces(t)["mnt"]; !ok || !v {
+		t.Skip("Kernel doesn't support mnt namespaces.")
 	}
 
-	t.Skipf("FIXME: Test not implemented.")
+	cmd := Command(sleepBin, "60")
+	cmd.NewMountNameSpace = true
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("Unexpected error: %s", err)
+	}
+	defer cmd.Wait()
+	defer cmd.Process.Kill()
+
+	if err := waitForProcessStart(cmd.Process.Pid, sleepBin); err != nil {
+		t.Fatalf("%s", err)
+	}
+
+	// Read my processes' pid name space.
+	myNS, err := os.Readlink("/proc/self/ns/mnt")
+	if err != nil {
+		t.Fatalf("Unexpected error: %s", err)
+	}
+
+	// Read the child processes' pid name space.
+	childNSFile := fmt.Sprintf("/proc/%d/ns/mnt", cmd.Process.Pid)
+	childNS, err := os.Readlink(childNSFile)
+	if err != nil {
+		t.Fatalf("Unexpected error: %s", err)
+	}
+
+	// Make sure that they are NOT the same.
+	if childNS == myNS {
+		t.Fatalf("Namespace of child not changed.")
+	}
 }
 
 func TestFeatureNewNetworkNameSpace(t *testing.T) {
 	// Check to see if network namespaces are supported.
-	if _, ok := SupportedNamespaces(t)["network"]; !ok {
+	if v, ok := SupportedNamespaces(t)["network"]; !ok || !v {
 		t.Skip("Kernel doesn't support network namespaces.")
 	}
 
@@ -575,34 +632,120 @@ func TestFeatureNewNetworkNameSpace(t *testing.T) {
 
 func TestFeatureNewPIDNameSpace(t *testing.T) {
 	// Check to see if PID namespaces are supported.
-	if _, ok := SupportedNamespaces(t)["pid"]; !ok {
+	if v, ok := SupportedNamespaces(t)["pid"]; !ok || !v {
 		t.Skip("Kernel doesn't support pid namespaces.")
 	}
 
-	t.Skipf("FIXME: Test not implemented.")
+	cmd := Command(sleepBin, "60")
+	cmd.NewPIDNameSpace = true
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("Unexpected error: %s", err)
+	}
+	defer cmd.Wait()
+	defer cmd.Process.Kill()
+
+	if err := waitForProcessStart(cmd.Process.Pid, sleepBin); err != nil {
+		t.Fatalf("%s", err)
+	}
+
+	// Read my processes' pid name space.
+	myNS, err := os.Readlink("/proc/self/ns/pid")
+	if err != nil {
+		t.Fatalf("Unexpected error: %s", err)
+	}
+
+	// Read the child processes' pid name space.
+	childNSFile := fmt.Sprintf("/proc/%d/ns/pid", cmd.Process.Pid)
+	childNS, err := os.Readlink(childNSFile)
+	if err != nil {
+		t.Fatalf("Unexpected error: %s", err)
+	}
+
+	// Make sure that they are NOT the same.
+	if childNS == myNS {
+		t.Fatalf("Namespace of child not changed.")
+	}
 }
 
 func TestFeatureNewUserNameSpace(t *testing.T) {
 	// Check to see if user namespaces are supported.
-	if _, ok := SupportedNamespaces(t)["user"]; !ok {
+	if v, ok := SupportedNamespaces(t)["user"]; !ok || !v {
 		t.Skip("Kernel doesn't support user namespaces.")
 	}
 
-	t.Skipf("FIXME: Test not implemented.")
+	cmd := Command(sleepBin, "60")
+	cmd.NewUserNameSpace = true
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("Unexpected error: %s", err)
+	}
+	defer cmd.Wait()
+	defer cmd.Process.Kill()
+
+	if err := waitForProcessStart(cmd.Process.Pid, sleepBin); err != nil {
+		t.Fatalf("%s", err)
+	}
+
+	// Read my processes' pid name space.
+	myNS, err := os.Readlink("/proc/self/ns/user")
+	if err != nil {
+		t.Fatalf("Unexpected error: %s", err)
+	}
+
+	// Read the child processes' pid name space.
+	childNSFile := fmt.Sprintf("/proc/%d/ns/user", cmd.Process.Pid)
+	childNS, err := os.Readlink(childNSFile)
+	if err != nil {
+		t.Fatalf("Unexpected error: %s", err)
+	}
+
+	// Make sure that they are NOT the same.
+	if childNS == myNS {
+		t.Fatalf("Namespace of child not changed.")
+	}
 }
 
 func TestFeatureNewUTSNameSpace(t *testing.T) {
 	// Check to see if UTC namespaces are supported.
-	if _, ok := SupportedNamespaces(t)["utc"]; !ok {
-		t.Skip("Kernel doesn't support utc namespaces.")
+	if v, ok := SupportedNamespaces(t)["uts"]; !ok || !v {
+		t.Skip("Kernel doesn't support uts namespaces.")
 	}
 
-	t.Skipf("FIXME: Test not implemented.")
+	cmd := Command(sleepBin, "60")
+	cmd.NewUTSNameSpace = true
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("Unexpected error: %s", err)
+	}
+	defer cmd.Wait()
+	defer cmd.Process.Kill()
+
+	if err := waitForProcessStart(cmd.Process.Pid, sleepBin); err != nil {
+		t.Fatalf("%s", err)
+	}
+
+	// Read my processes' pid name space.
+	myNS, err := os.Readlink("/proc/self/ns/uts")
+	if err != nil {
+		t.Fatalf("Unexpected error: %s", err)
+	}
+
+	// Read the child processes' pid name space.
+	childNSFile := fmt.Sprintf("/proc/%d/ns/uts", cmd.Process.Pid)
+	childNS, err := os.Readlink(childNSFile)
+	if err != nil {
+		t.Fatalf("Unexpected error: %s", err)
+	}
+
+	// Make sure that they are NOT the same.
+	if childNS == myNS {
+		t.Fatalf("Namespace of child not changed.")
+	}
 }
 
 func TestFeatureUserMap(t *testing.T) {
+	t.Skip("Usermaps are broken since go 1.6...")
+
 	// Check to see if user namespaces are supported.
-	if _, ok := SupportedNamespaces(t)["user"]; !ok {
+	if v, ok := SupportedNamespaces(t)["user"]; !ok || !v {
 		t.Skip("Kernel doesn't support user namespaces.")
 	}
 
@@ -650,7 +793,7 @@ func TestFeatureUserMap(t *testing.T) {
 }
 func TestFeatureGroupMap(t *testing.T) {
 	// Check to see if user namespaces are supported.
-	if _, ok := SupportedNamespaces(t)["user"]; !ok {
+	if v, ok := SupportedNamespaces(t)["user"]; !ok || !v {
 		t.Skip("Kernel doesn't support user namespaces.")
 	}
 

@@ -20,17 +20,18 @@
 // The maximum length of a filename read from the proc.
 #define FILENAMESIZE 4096
 
-// FIXME
-#include <sys/mount.h>
-
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <grp.h>
 #include <pthread.h>
 #include <sched.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sysexits.h>
+#include <sys/mount.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "goclone.h"
@@ -116,7 +117,7 @@ static void setup_files(goclone_cmd *cmd)
     do {
         closed = 0;
 
-        // Open the /proc directory. This can only real fail if /proc is not
+        // Open the /proc directory. This can only realy fail if /proc is not
         // mounted.
         d = opendir("/proc/self/fdinfo");
         if (d == NULL) {

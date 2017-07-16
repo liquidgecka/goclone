@@ -251,7 +251,7 @@ static void mount_proc(goclone_cmd *cmd)
 static void bindnode(char *src, char *dst)
 {
     if (mount(src, dst, NULL, MS_BIND, NULL) < 0) {
-        error(1, 0, "Failed to bind %s into new /dev filesystem", src);
+        _exit(EX_OSERR);
     }
 }
 
